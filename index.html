@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coleta Verde - Mapa de Pontos</title>
+
+    <!-- CSS do Leaflet -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-sA+e2tfjMlj1JY6mDXH4VhRkO7CwXB4JzYV+Q2zvPqc="
+      crossorigin=""
+    />
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f1f8f3;
+        }
+        header {
+            background-color: #2e7d32;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        #map {
+            height: 90vh;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h2>🌱 Coleta Verde - Pontos de Descarte</h2>
+    </header>
+
+    <div id="map"></div>
+
+    <!-- Script do Leaflet -->
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-o9N1j8Mk6l1w+dyy4FrvO4HRRkErKmwY2z1F+AAZQD4="
+      crossorigin=""
+    ></script>
+
+    <script>
+        // Inicializa o mapa
+        var map = L.map('map').setView([-30.0346, -51.2177], 12); // Porto Alegre como exemplo
+
+        // Adiciona camada base
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // Busca os pontos do back-end
+        fetch('http://127.0.0.1:5000/points')
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(point => {
+                    L.marker([point.latitude, point.longitude])
+                        .addTo(map)
+                        .bindPopup(
+                            `<b>${point.name}</b><br>${point.address}<br><i>${point.waste_type}</i>`
+                        );
+                });
+            })
+            .catch(err => console.error('Erro ao carregar pontos:', err));
+    </script>
+</body>
+</html>
