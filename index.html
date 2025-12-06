@@ -1,74 +1,193 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coleta Verde - Mapa de Pontos</title>
+  <meta charset="utf-8" />
+  <title>Coleta Verde - Mapa</title>
 
-    <!-- CSS do Leaflet -->
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-sA+e2tfjMlj1JY6mDXH4VhRkO7CwXB4JzYV+Q2zvPqc="
-      crossorigin=""
-    />
-
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f1f8f3;
-        }
-        header {
-            background-color: #2e7d32;
-            color: white;
-            padding: 15px;
-            text-align: center;
-        }
-        #map {
-            height: 90vh;
-            width: 100%;
-        }
-    </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin:0; font-family: Arial, sans-serif; }
+    header { background:#2e7d32; color:white; padding:12px; text-align:center; }
+    #controls { padding:8px; display:flex; gap:8px; align-items:center; background:#f6fdf6; flex-wrap:wrap; }
+    #map { height:80vh; width:100%; }
+    .btn { padding:6px 10px; border-radius:4px; border:1px solid #ccc; cursor:pointer; background:white; }
+    input[type="text"] { padding:6px; border:1px solid #ccc; border-radius:4px; }
+    label { font-size:14px; }
+  </style>
 </head>
-
 <body>
-    <header>
-        <h2>🌱 Coleta Verde - Pontos de Descarte</h2>
-    </header>
+  <header><h2>Coleta Verde — Pontos de Descarte</h2></header>
 
-    <div id="map"></div>
+  <div id="controls">
+    <!-- CEP obrigatório -->
+    <label for="cep">CEP (obrigatório):</label>
+    <input type="text" id="cep" placeholder="Ex: 90010-000" />
+    <button class="btn" id="buscarCEP">Buscar CEP</button>
 
-    <!-- Script do Leaflet -->
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-o9N1j8Mk6l1w+dyy4FrvO4HRRkErKmwY2z1F+AAZQD4="
-      crossorigin=""
-    ></script>
+    <!-- Endereço manual opcional (desabilitado até CEP) -->
+    <label for="address">Endereço (opcional):</label>
+    <input type="text" id="address" placeholder="Ex: Rua dos Andradas, 1000" disabled />
+    <button class="btn" id="buscarAddress" disabled>Buscar Endereço</button>
 
-    <script>
-        // Inicializa o mapa
-        var map = L.map('map').setView([-30.0346, -51.2177], 12); // Porto Alegre como exemplo
+    <!-- Filtro por tipo -->
+    <label>Filtro:</label>
+    <select id="filter" onchange="aplicarFiltro()">
+      <option value="">Todos</option>
+      <option value="Eletrônicos">Eletrônicos</option>
+      <option value="Pilhas">Pilhas</option>
+      <option value="Óleo">Óleo</option>
+    </select>
 
-        // Adiciona camada base
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
-        }).addTo(map);
+    <button class="btn" onclick="centralizarLocalizacao()">Ir para minha localização</button>
+  </div>
 
-        // Busca os pontos do back-end
-        fetch('http://127.0.0.1:5000/points')
-            .then(response => response.json())
-            .then(data => {
-                data.forEach(point => {
-                    L.marker([point.latitude, point.longitude])
-                        .addTo(map)
-                        .bindPopup(
-                            `<b>${point.name}</b><br>${point.address}<br><i>${point.waste_type}</i>`
-                        );
-                });
-            })
-            .catch(err => console.error('Erro ao carregar pontos:', err));
-    </script>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // --- LIMITES DE PORTO ALEGRE (bounding box)
+    // SW lat/lon e NE lat/lon (ajuste fino se necessário)
+    const boundsSW = [-30.30, -51.35];
+    const boundsNE = [-29.85, -51.05];
+    const bounds = L.latLngBounds(L.latLng(boundsSW[0], boundsSW[1]), L.latLng(boundsNE[0], boundsNE[1]));
+
+    // Inicializa mapa restrito a Porto Alegre
+    const map = L.map('map', {
+      maxBounds: bounds,
+      maxBoundsViscosity: 1.0,
+      minZoom: 11,
+      maxZoom: 19
+    }).setView([-30.0346, -51.2177], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const markersLayer = L.layerGroup().addTo(map);
+
+    // Carrega pontos (com filtro opcional)
+    function carregarPontos(wasteType = '') {
+      const url = wasteType ? `/points?waste_type=${encodeURIComponent(wasteType)}` : '/points';
+      fetch(url).then(r => r.json()).then(points => {
+        markersLayer.clearLayers();
+        points.forEach(p => {
+          // Garantir que lat/lon são números
+          const lat = parseFloat(p.latitude);
+          const lon = parseFloat(p.longitude);
+          if (!isNaN(lat) && !isNaN(lon)) {
+            const m = L.marker([lat, lon]).bindPopup(`<b>${p.name}</b><br>${p.address}<br><i>${p.waste_type}</i>`);
+            markersLayer.addLayer(m);
+          }
+        });
+      }).catch(err => console.error('Erro ao carregar pontos:', err));
+    }
+
+    // chamar inicialmente
+    carregarPontos();
+
+    function aplicarFiltro() {
+      const val = document.getElementById('filter').value;
+      carregarPontos(val);
+    }
+
+    // --- CEP: obrigatória
+    let cepValidado = false; // indica que usuário já fez busca de CEP bem-sucedida
+
+    document.getElementById('buscarCEP').addEventListener('click', async () => {
+      const cep = document.getElementById('cep').value.trim();
+      if (!cep) { alert('Por favor informe um CEP.'); return; }
+
+      // limpa estados anteriores
+      cepValidado = false;
+      document.getElementById('address').value = '';
+      document.getElementById('address').disabled = true;
+      document.getElementById('buscarAddress').disabled = true;
+
+      try {
+        const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await r.json();
+        if (data.erro) { alert('CEP não encontrado. Verifique e tente novamente.'); return; }
+
+        // Monta string para geocodificação via proxy /search
+        // Prefere logradouro + bairro + Porto Alegre para precisão
+        const enderecoCompleto = `${data.logradouro || ''} ${data.bairro || ''} Porto Alegre`;
+
+        // Chama rota /search do backend (proxy para Nominatim)
+        const searchResp = await fetch(`/search?q=${encodeURIComponent(enderecoCompleto)}`);
+        const resJson = await searchResp.json();
+
+        if (!resJson || resJson.error || resJson.length === 0) {
+          alert('Não foi possível geocodificar o CEP automaticamente. Tente o endereço manualmente.');
+          return;
+        }
+
+        const lat = parseFloat(resJson[0].lat);
+        const lon = parseFloat(resJson[0].lon);
+
+        // centraliza e coloca marcador inicial
+        map.setView([lat, lon], 15);
+        L.circle([lat, lon], {radius:60, color:'#2e7d32', fill:true, fillOpacity:0.2}).addTo(map);
+
+        cepValidado = true;
+        // habilita o campo de endereço (agora opcional)
+        document.getElementById('address').disabled = false;
+        document.getElementById('buscarAddress').disabled = false;
+
+      } catch (err) {
+        console.error(err);
+        alert('Erro ao buscar CEP. Tente novamente mais tarde.');
+      }
+    });
+
+    // --- Busca por endereço (opcional) via proxy /search
+    document.getElementById('buscarAddress').addEventListener('click', async () => {
+      if (!cepValidado) {
+        alert('Antes de buscar endereço, por favor informe e confirme seu CEP (campo obrigatório).');
+        return;
+      }
+      const q = document.getElementById('address').value.trim();
+      if (!q) { alert('Digite um endereço ou logradouro (opcional)'); return; }
+
+      try {
+        const resp = await fetch(`/search?q=${encodeURIComponent(q + ' Porto Alegre')}`);
+        const resJson = await resp.json();
+
+        if (!resJson || resJson.error || resJson.length === 0) {
+          alert('Endereço não encontrado.');
+          return;
+        }
+
+        const lat = parseFloat(resJson[0].lat);
+        const lon = parseFloat(resJson[0].lon);
+        map.setView([lat, lon], 15);
+        L.marker([lat, lon]).addTo(map).bindPopup('Endereço buscado').openPopup();
+
+      } catch (err) {
+        console.error(err);
+        alert('Erro na busca de endereço.');
+      }
+    });
+
+    // --- Geolocalização do navegador (mantido)
+    function centralizarLocalizacao() {
+      if (!navigator.geolocation) {
+        alert('Geolocalização não suportada pelo navegador');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude, lon = pos.coords.longitude;
+        // garantir que está dentro dos bounds de Porto Alegre
+        if (!bounds.contains([lat, lon])) {
+          alert('Sua localização está fora da área de Porto Alegre definida no sistema.');
+          return;
+        }
+        map.setView([lat, lon], 14);
+        L.circle([lat, lon], {radius:50, color:'#2e7d32', fill:true, fillOpacity:0.3}).addTo(map);
+      }, err => {
+        alert('Não foi possível obter localização: ' + err.message);
+      });
+    }
+  </script>
 </body>
 </html>
