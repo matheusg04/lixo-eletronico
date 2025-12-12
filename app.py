@@ -32,7 +32,7 @@ class Point(db.Model):
 def front():
     return send_from_directory('.', 'index.html')
 
-# Lista pontos (opcionalmente filtra por ?waste_type=...)
+# LISTAR pontos
 @app.route("/points", methods=["GET"])
 def get_points():
     waste = request.args.get("waste_type")
@@ -42,7 +42,7 @@ def get_points():
         points = Point.query.all()
     return jsonify([p.to_dict() for p in points])
 
-# Cadastra ponto
+# ADICIONAR ponto
 @app.route("/points", methods=["POST"])
 def add_point():
     data = request.json
@@ -57,25 +57,39 @@ def add_point():
     db.session.commit()
     return jsonify(new_point.to_dict()), 201
 
-# Proxy de busca (Nominatim) para evitar CORS e fornecer User-Agent apropriado
+# -----------------------------------------------------------
+# NOVA ROTA /search — usando LocationIQ (SEM QUEDAS/403)
+# -----------------------------------------------------------
 @app.route("/search")
 def search_address():
     q = request.args.get("q")
     if not q:
         return jsonify([]), 400
-    url = "https://nominatim.openstreetmap.org/search"
+
+    API_KEY = "pk.02dfdd55b64809e58b2c34ca92859ea6"  # <<< COLOQUE SUA CHAVE AQUI
+
+    url = "https://us1.locationiq.com/v1/search"
+
     try:
         resp = requests.get(
             url,
-            params={"format":"json","q":q,"limit":5},
-            headers={"User-Agent":"coletaverde/1.0 (matheusgantepenta@gmail.com)"},
+            params={
+                "key": API_KEY,
+                "q": q,
+                "format": "json",
+                "limit": 5
+            },
             timeout=10
         )
         resp.raise_for_status()
         return jsonify(resp.json())
+
     except requests.exceptions.RequestException as e:
-        # devolve um JSON vazio e código 502 em caso de erro externo
-        return jsonify({"error": "geocoding_failed", "details": str(e)}), 502
+        return jsonify({
+            "error": "locationiq_failed",
+            "details": str(e)
+        }), 502
+
 
 if __name__ == "__main__":
     with app.app_context():

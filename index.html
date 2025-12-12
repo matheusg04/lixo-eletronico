@@ -6,18 +6,104 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body { margin:0; font-family: Arial, sans-serif; }
-    header { background:#2e7d32; color:white; padding:12px; text-align:center; }
+    /* --- layout geral --- */
+    body { margin:0; font-family: Arial, sans-serif; background:#fff; }
+    header { background:#2e7d32; color:white; padding:12px; text-align:center; position:relative; }
+    header h2 { margin:0; }
     #controls { padding:8px; display:flex; gap:8px; align-items:center; background:#f6fdf6; flex-wrap:wrap; }
-    #map { height:80vh; width:100%; }
+    #map { height:87vh; width:100%; display:block; }
     .btn { padding:6px 10px; border-radius:4px; border:1px solid #ccc; cursor:pointer; background:white; }
     input[type="text"] { padding:6px; border:1px solid #ccc; border-radius:4px; }
     label { font-size:14px; }
+
+    /* --- menu inicial (overlay simples) --- */
+    #menu {
+      position:fixed;
+      inset:0;
+      background: linear-gradient(180deg, rgba(46,125,50,0.95), rgba(16,93,28,0.95));
+      color:white;
+      z-index:9999;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      gap:14px;
+      padding:20px;
+    }
+    #menu h1 { margin:0; font-size:32px; }
+    #menu p { max-width:800px; text-align:center; margin:0; opacity:0.95; }
+    .menu-btn { padding:12px 20px; border-radius:8px; border:none; cursor:pointer; font-size:16px; background:white; color:#2e7d32; }
+    .menu-small { background:transparent; border:1px solid rgba(255,255,255,0.2); color:white; padding:8px 12px; border-radius:6px; }
+
+    /* --- panel de conteúdo (sobre / como) --- */
+    .panel {
+      position:fixed;
+      inset:10vh 10vw 10vh 10vw;
+      background:white;
+      color:#111;
+      z-index:10000;
+      padding:18px;
+      border-radius:8px;
+      box-shadow:0 6px 20px rgba(0,0,0,0.25);
+      overflow:auto;
+      display:none;
+    }
+    .panel h3 { margin-top:0; }
+    .panel .close { float:right; cursor:pointer; background:#eee; padding:6px 8px; border-radius:6px; }
+
+    /* --- botão menu no canto dos controles --- */
+    #openMenuBtn { margin-left:auto; background:#2e7d32; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+
+    /* --- estilo do marcador destacado (nearest) se necessário via CSS --- */
+    .nearest-icon div { box-shadow: 0 0 0 3px rgba(255,255,255,0.9); }
+
+    /* responsividade simples */
+    @media(max-width:600px){
+      #controls { flex-direction:column; gap:6px; align-items:stretch; }
+      .menu-btn { width:90%; }
+      .panel { inset:5vh 4vw 5vh 4vw; }
+    }
   </style>
 </head>
 <body>
-  <header><h2>Coleta Verde — Pontos de Descarte</h2></header>
+  <header>
+    <h2>Coleta Verde — Pontos de Descarte</h2>
+  </header>
 
+  <!-- Menu inicial -->
+  <div id="menu" role="dialog" aria-modal="true">
+    <h1>Coleta Verde</h1>
+    <p>Encontre pontos de descarte correto de resíduos em Porto Alegre. Use o mapa para localizar ecopontos próximos ao seu CEP ou endereço.</p>
+
+    <button class="menu-btn" id="openMapBtn">Abrir mapa</button>
+
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <button class="menu-small" id="openSobreBtn">Sobre</button>
+      <button class="menu-small" id="openComoBtn">Como descartar</button>
+    </div>
+
+  </div>
+
+  <!-- Painel Sobre -->
+  <div id="panelSobre" class="panel" aria-hidden="true">
+    <div><span class="close" id="closeSobre">Fechar ✕</span></div>
+    <h3>Sobre a Coleta Verde</h3>
+    <p>O Coleta Verde é um projeto que facilita a localização de pontos oficiais de descarte de resíduos (eletrônicos, pilhas, óleo).</p> 
+    <p>O objetivo é incentivar o descarte correto, de maneira simples, eficiente e ajudar a reduzir resíduos indevidos na cidade.</p>
+  </div>
+
+  <!-- Painel Como descartar -->
+  <div id="panelComo" class="panel" aria-hidden="true">
+    <div><span class="close" id="closeComo">Fechar ✕</span></div>
+    <h3>Como descartar corretamente</h3>
+    <ul>
+      <li>Eletrônicos: levar em ecopontos ou pontos de coleta específicos — nunca descartar no lixo comum.</li>
+      <li>Pilhas e baterias: devolver em pontos de venda quando possível ou em ecopontos específicos.</li>
+      <li>Óleo de cozinha: guardar em garrafas e entregar em pontos que recebem óleo para reciclagem.</li>
+    </ul>
+  </div>
+
+  <!-- Controles e mapa (mantive sua estrutura e funcionalidade) -->
   <div id="controls">
     <!-- CEP obrigatório -->
     <label for="cep">CEP (obrigatório):</label>
@@ -39,19 +125,24 @@
     </select>
 
     <button class="btn" onclick="centralizarLocalizacao()">Ir para minha localização</button>
+
+    <!-- botão para retornar ao menu -->
+    <button id="openMenuBtn" title="Menu">Menu</button>
   </div>
 
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // --- LIMITES DE PORTO ALEGRE (bounding box)
-    // SW lat/lon e NE lat/lon (ajuste fino se necessário)
+    /* -------------------------
+       Variáveis iniciais/estado
+       ------------------------- */
+    // limites Porto Alegre
     const boundsSW = [-30.30, -51.35];
     const boundsNE = [-29.85, -51.05];
     const bounds = L.latLngBounds(L.latLng(boundsSW[0], boundsSW[1]), L.latLng(boundsNE[0], boundsNE[1]));
 
-    // Inicializa mapa restrito a Porto Alegre
+    // mapa
     const map = L.map('map', {
       maxBounds: bounds,
       maxBoundsViscosity: 1.0,
@@ -66,13 +157,59 @@
 
     const markersLayer = L.layerGroup().addTo(map);
 
-    // Carrega pontos (com filtro opcional)
+    // estado do CEP e última geocodificação
+    let cepValidado = false;
+    let lastGeocodedLat = null;
+    let lastGeocodedLon = null;
+    let userPositionMarker = null;
+    let nearestHighlightMarker = null;
+
+    /* -------------------------
+       Funções de menu / painéis
+       ------------------------- */
+    const menu = document.getElementById('menu');
+    const openMapBtn = document.getElementById('openMapBtn');
+    const openSobreBtn = document.getElementById('openSobreBtn');
+    const openComoBtn = document.getElementById('openComoBtn');
+    const panelSobre = document.getElementById('panelSobre');
+    const panelComo = document.getElementById('panelComo');
+    const closeSobre = document.getElementById('closeSobre');
+    const closeComo = document.getElementById('closeComo');
+    const openMenuBtn = document.getElementById('openMenuBtn');
+
+    openMapBtn.addEventListener('click', () => {
+      menu.style.display = 'none';
+      // garantir que o mapa redimensiona ao ser mostrado
+      setTimeout(()=> map.invalidateSize(), 300);
+    });
+
+    openSobreBtn.addEventListener('click', () => {
+      panelSobre.style.display = 'block';
+      panelSobre.setAttribute('aria-hidden','false');
+    });
+    openComoBtn.addEventListener('click', () => {
+      panelComo.style.display = 'block';
+      panelComo.setAttribute('aria-hidden','false');
+    });
+    closeSobre.addEventListener('click', () => { panelSobre.style.display='none'; panelSobre.setAttribute('aria-hidden','true'); });
+    closeComo.addEventListener('click', () => { panelComo.style.display='none'; panelComo.setAttribute('aria-hidden','true'); });
+
+    // botão "Menu" nos controles volta ao menu inicial
+    openMenuBtn.addEventListener('click', () => {
+      menu.style.display = 'flex';
+      // fechar painéis caso estejam abertos
+      panelSobre.style.display='none';
+      panelComo.style.display='none';
+    });
+
+    /* -------------------------
+       Carregar pontos (igual antes)
+       ------------------------- */
     function carregarPontos(wasteType = '') {
       const url = wasteType ? `/points?waste_type=${encodeURIComponent(wasteType)}` : '/points';
       fetch(url).then(r => r.json()).then(points => {
         markersLayer.clearLayers();
         points.forEach(p => {
-          // Garantir que lat/lon são números
           const lat = parseFloat(p.latitude);
           const lon = parseFloat(p.longitude);
           if (!isNaN(lat) && !isNaN(lon)) {
@@ -82,8 +219,6 @@
         });
       }).catch(err => console.error('Erro ao carregar pontos:', err));
     }
-
-    // chamar inicialmente
     carregarPontos();
 
     function aplicarFiltro() {
@@ -91,15 +226,84 @@
       carregarPontos(val);
     }
 
-    // --- CEP: obrigatória
-    let cepValidado = false; // indica que usuário já fez busca de CEP bem-sucedida
+    /* -------------------------
+       Haversine (km)
+       ------------------------- */
+    function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
 
+    /* -------------------------
+       Encontrar e mostrar mais próximo
+       ------------------------- */
+    async function encontrarEMostrarMaisProximo() {
+      if (!cepValidado || lastGeocodedLat === null || lastGeocodedLon === null) return;
+
+      const tipo = document.getElementById('filter').value || '';
+      const url = tipo ? `/points?waste_type=${encodeURIComponent(tipo)}` : '/points';
+
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const pontos = await resp.json();
+
+        let maisProximo = null;
+        let menorDist = Infinity;
+
+        pontos.forEach(p => {
+          const plat = parseFloat(p.latitude);
+          const plon = parseFloat(p.longitude);
+          if (isNaN(plat) || isNaN(plon)) return;
+          const d = haversineKm(lastGeocodedLat, lastGeocodedLon, plat, plon);
+          if (d < menorDist) { menorDist = d; maisProximo = p; }
+        });
+
+        if (!maisProximo) return;
+
+        if (nearestHighlightMarker) { nearestHighlightMarker.remove(); nearestHighlightMarker = null; }
+
+        const highlightIcon = L.divIcon({
+          className: 'nearest-icon',
+          html: `<div style="background:#2e7d32;border:3px solid white;border-radius:18px;width:36px;height:36px;"></div>`,
+          iconSize: [36,36],
+          iconAnchor: [18,36]
+        });
+
+        nearestHighlightMarker = L.marker([maisProximo.latitude, maisProximo.longitude], {icon: highlightIcon}).addTo(map);
+
+        const distanciaTexto = `${menorDist.toFixed(2)} km`;
+
+        nearestHighlightMarker.bindPopup(
+          `<b>${maisProximo.name}</b><br>${maisProximo.address}<br><i>${maisProximo.waste_type}</i><br><b>Distância:</b> ${distanciaTexto}<br><a target="_blank" href="https://www.google.com/maps/dir/?api=1&origin=${lastGeocodedLat},${lastGeocodedLon}&destination=${maisProximo.latitude},${maisProximo.longitude}">Ver rota</a>`
+        ).openPopup();
+
+        map.setView([maisProximo.latitude, maisProximo.longitude], 14);
+
+      } catch (err) {
+        console.error('Erro ao calcular ponto mais próximo:', err);
+      }
+    }
+
+    /* -------------------------
+       CEP (igual antes) - geocodifica via /search proxy
+       ------------------------- */
     document.getElementById('buscarCEP').addEventListener('click', async () => {
       const cep = document.getElementById('cep').value.trim();
       if (!cep) { alert('Por favor informe um CEP.'); return; }
 
-      // limpa estados anteriores
       cepValidado = false;
+      lastGeocodedLat = null;
+      lastGeocodedLon = null;
+      if (userPositionMarker) { userPositionMarker.remove(); userPositionMarker = null; }
+      if (nearestHighlightMarker) { nearestHighlightMarker.remove(); nearestHighlightMarker = null; }
+
       document.getElementById('address').value = '';
       document.getElementById('address').disabled = true;
       document.getElementById('buscarAddress').disabled = true;
@@ -109,30 +313,34 @@
         const data = await r.json();
         if (data.erro) { alert('CEP não encontrado. Verifique e tente novamente.'); return; }
 
-        // Monta string para geocodificação via proxy /search
-        // Prefere logradouro + bairro + Porto Alegre para precisão
-        const enderecoCompleto = `${data.logradouro || ''} ${data.bairro || ''} Porto Alegre`;
+        const enderecoCompleto = `${data.logradouro || ''} ${data.bairro || ''} Porto Alegre`.trim();
 
-        // Chama rota /search do backend (proxy para Nominatim)
         const searchResp = await fetch(`/search?q=${encodeURIComponent(enderecoCompleto)}`);
         const resJson = await searchResp.json();
 
         if (!resJson || resJson.error || resJson.length === 0) {
           alert('Não foi possível geocodificar o CEP automaticamente. Tente o endereço manualmente.');
+          document.getElementById('address').disabled = false;
+          document.getElementById('buscarAddress').disabled = false;
           return;
         }
 
         const lat = parseFloat(resJson[0].lat);
         const lon = parseFloat(resJson[0].lon);
 
-        // centraliza e coloca marcador inicial
+        // marcador usuário
         map.setView([lat, lon], 15);
-        L.circle([lat, lon], {radius:60, color:'#2e7d32', fill:true, fillOpacity:0.2}).addTo(map);
+        userPositionMarker = L.circleMarker([lat, lon], {radius:8, color:'#2e7d32', fillColor:'#2e7d32', fillOpacity:0.8}).addTo(map).bindPopup("Sua posição aproximada").openPopup();
 
         cepValidado = true;
-        // habilita o campo de endereço (agora opcional)
+        lastGeocodedLat = lat;
+        lastGeocodedLon = lon;
+
         document.getElementById('address').disabled = false;
         document.getElementById('buscarAddress').disabled = false;
+
+        // chama recalculo e destaque
+        encontrarEMostrarMaisProximo();
 
       } catch (err) {
         console.error(err);
@@ -140,7 +348,9 @@
       }
     });
 
-    // --- Busca por endereço (opcional) via proxy /search
+    /* -------------------------
+       Busca por endereço (igual antes)
+       ------------------------- */
     document.getElementById('buscarAddress').addEventListener('click', async () => {
       if (!cepValidado) {
         alert('Antes de buscar endereço, por favor informe e confirme seu CEP (campo obrigatório).');
@@ -160,8 +370,16 @@
 
         const lat = parseFloat(resJson[0].lat);
         const lon = parseFloat(resJson[0].lon);
+
+        if (userPositionMarker) { userPositionMarker.remove(); userPositionMarker = null; }
+        userPositionMarker = L.circleMarker([lat, lon], {radius:8, color:'#2e7d32', fillColor:'#2e7d32', fillOpacity:0.8}).addTo(map).bindPopup("Sua posição aproximada").openPopup();
+
+        lastGeocodedLat = lat;
+        lastGeocodedLon = lon;
+
         map.setView([lat, lon], 15);
-        L.marker([lat, lon]).addTo(map).bindPopup('Endereço buscado').openPopup();
+
+        encontrarEMostrarMaisProximo();
 
       } catch (err) {
         console.error(err);
@@ -169,7 +387,9 @@
       }
     });
 
-    // --- Geolocalização do navegador (mantido)
+    /* -------------------------
+       Geolocalização do navegador (igual antes)
+       ------------------------- */
     function centralizarLocalizacao() {
       if (!navigator.geolocation) {
         alert('Geolocalização não suportada pelo navegador');
@@ -177,17 +397,31 @@
       }
       navigator.geolocation.getCurrentPosition(pos => {
         const lat = pos.coords.latitude, lon = pos.coords.longitude;
-        // garantir que está dentro dos bounds de Porto Alegre
         if (!bounds.contains([lat, lon])) {
           alert('Sua localização está fora da área de Porto Alegre definida no sistema.');
           return;
         }
+
+        if (userPositionMarker) { userPositionMarker.remove(); userPositionMarker = null; }
+        userPositionMarker = L.circleMarker([lat, lon], {radius:8, color:'#2e7d32', fillColor:'#2e7d32', fillOpacity:0.8}).addTo(map).bindPopup("Sua posição aproximada").openPopup();
+
+        lastGeocodedLat = lat;
+        lastGeocodedLon = lon;
+
         map.setView([lat, lon], 14);
-        L.circle([lat, lon], {radius:50, color:'#2e7d32', fill:true, fillOpacity:0.3}).addTo(map);
+
+        encontrarEMostrarMaisProximo();
+
       }, err => {
         alert('Não foi possível obter localização: ' + err.message);
       });
     }
+
+    /* -------------------------
+       Ao carregar, manter menu visível e map pronto
+       ------------------------- */
+    // (menu já está visível por padrão; se quiser iniciar sem menu, mude display)
+    setTimeout(()=> map.invalidateSize(), 300);
   </script>
 </body>
 </html>

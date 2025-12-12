@@ -1,9 +1,33 @@
-import requests
-data = [
-  {"name":"EcoPonto Central","address":"Rua Principal, 123","latitude":-30.0346,"longitude":-51.2177,"waste_type":"Eletrônicos"},
-  {"name":"Ponto Pilhas","address":"Av. Teste, 45","latitude":-30.0400,"longitude":-51.2100,"waste_type":"Pilhas"},
-  {"name":"Ponto Óleo","address":"R. Verde, 10","latitude":-30.0300,"longitude":-51.2200,"waste_type":"Óleo"}
+import sqlite3
+
+conn = sqlite3.connect("points.db")
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lng REAL NOT NULL,
+    category TEXT NOT NULL
+)
+""")
+
+# PONTOS DE TESTE
+cursor.execute("DELETE FROM points")
+
+points = [
+    ("Ponto Teste 1", "Rua A, Porto Alegre", -30.03, -51.20, "eletronico"),
+    ("Ponto Teste 2", "Rua B, Porto Alegre", -30.05, -51.22, "eletronico")
 ]
-for p in data:
-    r = requests.post("http://127.0.0.1:5000/points", json=p)
-    print(r.status_code, r.json())
+
+cursor.executemany(
+    "INSERT INTO points (name, address, lat, lng, category) VALUES (?, ?, ?, ?, ?)", 
+    points
+)
+
+conn.commit()
+conn.close()
+
+print("Seed concluído.")
