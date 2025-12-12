@@ -1,52 +1,50 @@
-# Documentando o Projeto: Aplicação Web para Descarte de Resíduos
+# Coleta Verde — Aplicação Web para Descarte Sustentável
 
-## Resumo do Projeto  
-Este projeto tem como objetivo desenvolver uma aplicação web que auxilie a população no descarte correto de resíduos como pilhas, óleo de cozinha e lixo eletrônico. A solução permite que o usuário informe seu CEP e visualize pontos de coleta próximos, com informações fornecidas sobre cada local. A proposta busca contribuir para a conscientização ambiental e facilitar o acesso a locais de descarte adequados.
+A **Coleta Verde** é uma aplicação web desenvolvida para facilitar a localização de pontos de descarte adequado de resíduos, como eletrônicos, pilhas e óleo de cozinha.  
+O objetivo principal é oferecer uma solução prática, acessível e que incentive o cuidado com o meio ambiente.
 
-## Definição do Problema  
-Grande parte da população não sabe onde descartar corretamente resíduos que não podem ir no lixo comum, como eletrônicos, pilhas e óleo usado. O resultado é o descarte incorreto, que contamina o solo, a água e causa impactos ambientais graves.  
-Esse problema atinge tanto o cidadão, que carece de informações acessíveis, quanto a sociedade em geral, que sofre com os efeitos da poluição.
+---
 
-## Objetivos  
-- Criar uma plataforma digital que mostre pontos de coleta próximos ao usuário.  
-- Fornecer informações claras sobre quais tipos de resíduos cada ponto aceita.  
-- Facilitar a busca pelo CEP e a visualização em mapa interativo.  
-- Promover a conscientização ambiental através da tecnologia.
+## Por que este projeto é importante?
 
-## Stack Tecnológico  
-Para o desenvolvimento da aplicação foram escolhidas tecnologias acessíveis e de fácil integração:  
-- Frontend: HTML, CSS e JavaScript, para construção das interfaces de usuário.  
-- Backend: Python com Flask (ou Node.js como alternativa), para gerenciar rotas e requisições.  
-- Banco de Dados: MySQL ou SQLite, para armazenar informações dos pontos de coleta.  
-- APIs de Mapas: Google Maps ou Leaflet, para exibir a localização geográfica dos pontos.
+O descarte incorreto de resíduos ainda é um grande desafio no Brasil.  
+Segundo a ONU, **mais de 60% do lixo eletrônico gerado na América Latina não recebe o descarte adequado**.  
+Isso reforça a necessidade de soluções que facilitem a vida do cidadão comum.
 
-## Descrição da Solução  
-O sistema será dividido em duas partes principais:
+A Coleta Verde nasce dessa ideia: tornar mais simples encontrar um ponto de coleta confiável perto de você.
 
-1. **Área do usuário**: onde será possível digitar o CEP e encontrar pontos de coleta próximos. O mapa exibirá os locais cadastrados e mostrará informações como endereço, resíduos aceitos e horário de funcionamento.  
-2. **Área de administração**: destinada ao cadastro e atualização dos pontos de coleta (CRUD básico).
+---
 
-## Arquitetura  
-A arquitetura seguirá o modelo cliente-servidor. O frontend fará as requisições ao backend, que consultará o banco de dados e retornará os pontos de coleta correspondentes. O mapa será integrado ao frontend, consumindo uma API de geolocalização.
+## O que a aplicação faz?
 
-## Validação  
-A validação inicial será feita com casos de teste simples:  
-- Procurar um CEP válido e confirmar que os pontos próximos aparecem no mapa.  
-- Verificar se os pontos de coleta cadastrados exibem as informações corretas.  
-- Testar o CRUD de pontos (inserção, edição e exclusão).
+Este projeto foi desenvolvido como um **MVP**.  
+Na versão atual, a aplicação inclui:
 
-## Estratégia  
-A estratégia de desenvolvimento seguirá entregas incrementais:  
-1. Montagem do ambiente e repositório.  
-2. Protótipo das telas principais.  
-3. Implementação de backend e banco de dados.  
-4. Integração do mapa.  
-5. Testes e ajustes finais.
+- Mapa interativo (**Leaflet.js**)  
+- API própria construída em **Flask**  
+- Listagem de pontos de coleta direto do banco de dados  
+- Cadastro de novos pontos usando requisições HTTP  
+- Banco de dados **SQLite** integrado  
+- Interface **HTML** conectada ao back-end
 
-## Conclusões  
-O projeto busca unir tecnologia e sustentabilidade, oferecendo uma ferramenta prática para resolver um problema real: o descarte inadequado de resíduos. Além de ajudar os usuários, a solução pode ser ampliada e utilizada por organizações e prefeituras, tornando-se um recurso de impacto social e ambiental positivo.
+---
 
-## Referências  
-- Documentação da API do Google Maps  
-- Leaflet.js — Biblioteca Open Source para mapas interativos  
-- Ministério do Meio Ambiente — Materiais sobre coleta seletiva e descarte correto  
+## Tecnologias utilizadas
+
+- Python + Flask  
+- SQLite  
+- HTML, CSS e JavaScript  
+- Leaflet.js (mapa)  
+- API Nominatim (OpenStreetMap)  
+- GitHub para versionamento  
+
+---
+
+## Resultado do MVP
+
+A Coleta Verde entrega um MVP cujo objetivo é:
+
+> **Auxiliar pessoas a encontrarem pontos de descarte correto de forma rápida e intuitiva.**
+
+---
+
